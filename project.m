@@ -51,8 +51,10 @@ acc = sum(diag(c_mat)) / sum(c_mat, 'all');
 layers = [
     featureInputLayer(size(normed_lab_X, 2),"Name","featureinput")
     fullyConnectedLayer(256,"Name","fc_1")
+    dropoutLayer(0.3, "Name", "dropout_1")
     reluLayer("Name","relu_1")
     fullyConnectedLayer(128,"Name","fc_2")
+    dropoutLayer(0.3, "Name", "dropout_2")
     reluLayer("Name","relu_2")
     fullyConnectedLayer(64,"Name","fc_3")
     reluLayer("Name","relu_3")
@@ -66,41 +68,39 @@ options = trainingOptions('adam', ...
     'Plots', 'training-progress', ...
     'Verbose', false);
 
-net = trainNetwork(labeled_X, categorical(labeled_Y), layers, options);
+net = trainNetwork(normed_lab_X, categorical(labeled_Y), layers, options);
 net_pred = classify(net, normed_unlab_X);
+c_mat = confusionmat(net_pred, categorical(idx(101:1000)));
+acc = sum(diag(c_mat)) / sum(c_mat, 'all');
+
+tree = fitctree(normed_lab_X, categorical(labeled_Y));
+tree_pred = tree.predict(normed_unlab_X);
+c_mat = confusionmat(tree_pred, categorical(idx(101:1000)));
+acc = sum(diag(c_mat)) / sum(c_mat, 'all');
+
+bayes = fitcnb(normed_lab_X, categorical(labeled_Y), 'Distribution', 'kernel');
+bayes_pred = bayes.predict(normed_unlab_X);
+c_mat = confusionmat(bayes_pred, categorical(idx(101:1000)));
+acc = sum(diag(c_mat)) / sum(c_mat, 'all');
+
+svm = fitcnb(normed_lab_X, categorical(labeled_Y), 'Distribution', 'kernel');
+bayes_pred = bayes.predict(normed_unlab_X);
+c_mat = confusionmat(bayes_pred, categorical(idx(101:1000)));
+acc = sum(diag(c_mat)) / sum(c_mat, 'all');
+
+voting_group = [categorical(graphMd_1.FittedLabels),...
+    categorical(selftr_1.FittedLabels), ...
+    categorical(idx(101:1000)), categorical(knn_pred),...
+    net_pred, tree_pred, bayes_pred];
+
+voting_group
 
 
-
-%{
 %Determine whether classes are balanced
 %{
 [C,ia,ic] = unique(labeled_Y);
 a_counts = accumarray(ic,1);
 value_counts = [C, a_counts]
-%}
-
-
- %{
-layers = [
-    featureInputLayer(size(normed_lab_1, 2),"Name","featureinput")
-    fullyConnectedLayer(256,"Name","fc_1")
-    reluLayer("Name","relu_1")
-    fullyConnectedLayer(128,"Name","fc_2")
-    reluLayer("Name","relu_2")
-    fullyConnectedLayer(64,"Name","fc_3")
-    softmaxLayer("Name","sigmoid")
-    classificationLayer("Name","classification")];
-
-options = trainingOptions('adam', ...
-    'MiniBatchSize', 32, ...
-    'Shuffle', 'every-epoch', ...
-    'Plots', 'training-progress', ...
-    'Verbose', false);
-
-net = trainNetwork(labeled_X, labeled_Y, layers, options);
-
-%}
-%}
 %}
 
 function pred_ = logistic_regression(X_, w_)
